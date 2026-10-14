@@ -33,6 +33,11 @@ export interface RendererOptions {
   /** Suspend le rendu tant que la scène est entièrement masquée. */
   readonly paused?: () => boolean;
   /**
+   * Appelé au début de chaque image, avant toute lecture du scroll : la page
+   * y avance d'abord, la sculpture se dessine ensuite sur la même position.
+   */
+  readonly beforeFrame?: () => void;
+  /**
    * Définition adaptative : si la machine ne tient pas la cadence, le rendu
    * descend d'un cran (jamais l'inverse, voir createScaleGovernor).
    */
@@ -41,6 +46,9 @@ export interface RendererOptions {
 
 const SHAPE_MORPH_RATE = 0.85;
 const SHAPE_SNAP = 0.002;
+// Au-delà, la forme centrale est entièrement absorbée par la lame (voir
+// sculpt.scale dans sculpture.wgsl, seuil 0.02 sur l'échelle 1 - ease).
+const HIDDEN_SHAPE_MORPH = 0.95;
 // Un déploiement complet de la lame prend 0,45 s, à vitesse constante.
 const PANEL_MORPH_SPEED = 1 / 0.45;
 // Sous ~50 images/s en moyenne pendant 1,5 s, la définition baisse d'un
@@ -182,6 +190,7 @@ export function createRenderer(
     }
     frameLoop(context, (currentFrame) => {
       try {
+        options.beforeFrame?.();
         if (typeof document !== 'undefined' && document.hidden) return;
         if (!canvasVisible || options.paused?.()) return;
         if (scaleChanged) {
@@ -201,6 +210,9 @@ export function createRenderer(
         // shader calcule deux formes au lieu d'une.
         if (Math.abs(adjustedTarget - shapeValue) < SHAPE_SNAP) shapeValue = adjustedTarget;
         panelFrame = easePanel(panelFrame, options.scrollPanel?.() ?? OFF_PANEL_FRAME, time.deltaTime);
+        // Lame entièrement déployée : la forme centrale est invisible, elle
+        // passe d'un coup à la suivante au lieu de se transformer à vue.
+        if (panelFrame.morph >= HIDDEN_SHAPE_MORPH) shapeValue = adjustedTarget;
         scene.render(currentFrame, output, input.camera, controls, {
           sculptureTime: options.scrollRotation ? scrollExtra : sculptureTime,
           clockTime: time.time,

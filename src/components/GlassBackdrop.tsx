@@ -1,15 +1,29 @@
 import { useState, useSyncExternalStore } from 'react';
 import { Example as GlassSculpture } from '../../glass-sculpture';
 import type { ScenePanelFrame } from '../../glass-sculpture/scene';
-import { usePageProgress } from '../hooks/usePageProgress';
-import { useSectionProgress } from '../hooks/useSectionProgress';
+import { flushFrame } from '../frameClock';
 import { PROJECTS } from '../projects';
 import { panelFeedback, viewerState } from '../projectViewer';
 import { currentTheme, subscribeTheme } from '../theme';
-import { WORK_SECTION_ID, panelTarget } from '../workScroll';
+import { WORK_SECTION_ID, panelTarget, workCrossing } from '../workScroll';
 
 // Part de la zone projets pendant laquelle les fragments s'écartent.
 const FRAGMENTS_OPENING = 0.04;
+
+function pageProgress(): number {
+  const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  return Math.min(1, Math.max(0, window.scrollY / maxScroll));
+}
+
+// Même mesure que useSectionProgress : 0 au haut de la section, 1 quand son
+// bas atteint le bas de l'écran.
+function sectionProgress(id: string): number {
+  const element = document.getElementById(id);
+  if (!element) return 0;
+  const rect = element.getBoundingClientRect();
+  const span = Math.max(1, rect.height - window.innerHeight);
+  return Math.min(1, Math.max(0, -Math.min(0, rect.top) / span));
+}
 
 interface GlassBackdropProps {
   readonly shapeCount: number;
@@ -24,8 +38,9 @@ interface GlassBackdropProps {
  * ne passe par-dessus le rendu, tout vit dans la même matière.
  */
 export function GlassBackdrop({ shapeCount }: GlassBackdropProps) {
-  const progressRef = usePageProgress();
-  const workProgressRef = useSectionProgress(`#${WORK_SECTION_ID}`);
+  // Le scroll est lu à chaque image, après que la page a avancé (voir
+  // frameClock) : la sculpture suit exactement la position affichée.
+  const workProgress = () => sectionProgress(WORK_SECTION_ID);
   const night = useSyncExternalStore(subscribeTheme, currentTheme) === 'night';
   const [hasGpu] = useState(
     () => typeof navigator !== 'undefined' && 'gpu' in navigator,
@@ -35,21 +50,23 @@ export function GlassBackdrop({ shapeCount }: GlassBackdropProps) {
     return <div className="glass-backdrop glass-backdrop--fallback" aria-hidden="true" />;
   }
 
-  const rotation = () => progressRef.current * Math.PI * 8;
+  const rotation = () => pageProgress() * Math.PI * 8;
   // Chaque forme tient un palier, le passage à la suivante se fait au milieu
   // de sa tranche de scroll : hors passage, une seule forme à calculer.
+  // Dans la zone projets, chaque passage entre deux lames montre une forme
+  // nouvelle (le changement a lieu pendant que la lame la cache).
   const shapeMorph = () => {
-    const position = progressRef.current * (shapeCount * 0.33);
+    const position = pageProgress() * (shapeCount * 0.33);
     const step = Math.floor(position);
     const local = Math.min(1, Math.max(0, (position - step - 0.3) / 0.4));
-    return step + local * local * (3 - 2 * local);
+    return step + local * local * (3 - 2 * local) + workCrossing(workProgress());
   };
   // Les fragments s'ouvrent à l'entrée de la zone projets, en même temps que
   // la première lame, puis restent écartés : entre deux projets, seule la
   // pièce centrale se replie (0.83, même écart que PANEL_CLEARANCE dans
   // sculpture.wgsl). Ils s'éloignent encore un peu vers la fin de la zone.
   const split = () => {
-    const progress = workProgressRef.current;
+    const progress = workProgress();
     const opening = Math.min(1, progress / FRAGMENTS_OPENING);
     const spread = Math.min(1, Math.max(0, (progress - 0.4) / 0.47));
     return Math.max(opening * opening * (3 - 2 * opening) * 0.83, spread);
@@ -58,7 +75,7 @@ export function GlassBackdrop({ shapeCount }: GlassBackdropProps) {
   // scroll, pour pouvoir avancer vers la caméra puis revenir en place.
   const scrollPanel = (): ScenePanelFrame => {
     const viewer = viewerState();
-    const target = viewer.phase === 'idle' ? panelTarget(workProgressRef.current) : { morph: 1, index: viewer.index };
+    const target = viewer.phase === 'idle' ? panelTarget(workProgress()) : { morph: 1, index: viewer.index };
     return { ...target, ...panelFeedback() };
   };
   // Page projet opaque par-dessus : inutile de faire tourner le GPU.
@@ -83,6 +100,7 @@ export function GlassBackdrop({ shapeCount }: GlassBackdropProps) {
         projects={PROJECTS}
         scrollPanel={scrollPanel}
         paused={paused}
+        beforeFrame={flushFrame}
         adaptiveScale
       />
     </div>

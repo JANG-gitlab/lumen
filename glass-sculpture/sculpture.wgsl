@@ -182,6 +182,11 @@ const PANEL_DEPTH_RATIO: f32 = 0.09;
 const PANEL_RIPPLE: f32 = 0.06;
 const PANEL_IMAGE_DEPTH: f32 = 0.6;
 const PANEL_CLEARANCE: f32 = 0.83;
+// Encombrement réel d'un fragment (les formes tiennent dans ~1.2) plus un
+// vide franc : les fragments ne doivent jamais toucher les bords de la lame.
+const FRAGMENT_REACH: f32 = 1.25;
+const FRAGMENT_GAP: f32 = 0.2;
+const SHAPE_FUSION: f32 = 0.12;
 const PANEL_COVER: f32 = 1.03;
 const LENS_RADIUS: f32 = 0.22;
 const LENS_HEIGHT: f32 = 0.07;
@@ -206,6 +211,10 @@ struct ShapeState {
   bounds: vec3f,
   pieces: i32,
   zero: i32,
+  // Échelle de la pièce centrale : elle se contracte dans la lame qui grandit.
+  scale: f32,
+  // Rayon de fusion fragments / pièce centrale, nul une fois la lame posée.
+  fusion: f32,
 }
 
 // Constantes par pixel, calculées une fois dans fs_main plutôt qu'à chaque
@@ -222,9 +231,10 @@ fn prepare_frame(camera_position: vec3f, right: vec3f, up: vec3f, screen_aspect:
   let lift = clamp(params.panel_lift, 0.0, 1.0);
   let cover_distance = CAMERA_LENS * params.panel_half_height * min(1.0, aspect / screen_aspect) / PANEL_COVER;
   let travel = (length(camera_position - CAMERA_TARGET) - cover_distance) * lift;
-  // Dépliage : la lame part d'un noyau épais et compact, puis s'étire
-  // jusqu'à sa taille finale en s'affinant (épaisseur liée à la hauteur).
-  let half_height = params.panel_half_height * mix(0.55, 1.0, ease);
+  // Dépliage : la lame naît petite et épaisse au cœur de la forme, puis
+  // s'étire jusqu'à sa taille finale en s'affinant (épaisseur liée à la
+  // hauteur), pendant que la forme se contracte en elle.
+  let half_height = params.panel_half_height * mix(0.2, 1.0, ease);
   panel = PanelFrame(
     CAMERA_TARGET + facing * travel,
     right,
@@ -239,8 +249,12 @@ fn prepare_frame(camera_position: vec3f, right: vec3f, up: vec3f, screen_aspect:
   // Fragmentation : des copies de la sculpture s'écartent de part et
   // d'autre de l'écran. La lame qui se déplie les repousse hors de son
   // emprise, comme si la matière se partageait pour lui faire place.
+  // L'écart minimal suit la largeur réelle de la lame déployée (elle change
+  // avec le format de l'écran), sinon les fragments viennent s'y souder.
   let split_amount = max(clamp(params.split, 0.0, 1.0), ease * PANEL_CLEARANCE);
-  let side = select(right * split_amount * 3.2, vec3f(0.0), split_amount < 0.001);
+  let clearance = params.panel_half_height * aspect + FRAGMENT_REACH + FRAGMENT_GAP;
+  let side_distance = max(split_amount * 3.2, clearance * smoothstep(0.0, 0.6, ease));
+  let side = select(right * side_distance, vec3f(0.0), split_amount < 0.001);
 
   // Boîte englobant toute la sculpture (pièce centrale, fragments, lame) :
   // les rayons qui la manquent ne marchent pas du tout.
@@ -261,6 +275,8 @@ fn prepare_frame(camera_position: vec3f, right: vec3f, up: vec3f, screen_aspect:
     bounds,
     select(4, 2, split_amount < 0.001),
     min(shape_count, 0),
+    1.0 - ease,
+    SHAPE_FUSION * (1.0 - smoothstep(0.0, 0.5, ease)),
   );
 }
 
@@ -313,17 +329,23 @@ fn spin(world_point: vec3f) -> vec3f {
 // le compilateur ne peut pas dérouler : sinon il recopie les neuf formes à
 // chaque appel, et la compilation du shader prend plusieurs secondes.
 fn sculpture_distance(world_point: vec3f) -> f32 {
-  var central = 0.0;
+  var central = 1e5;
   var fragments = 1e5;
   for (var piece = sculpt.zero; piece < sculpt.pieces; piece += 1) {
     if (piece == 1 && sculpt.blend < 0.001) { continue; }
-    // Lame entièrement déployée : la forme centrale ne pèse plus rien.
-    if (piece < 2 && panel.ease >= 1.0) { continue; }
-    let center = select(vec3f(0.0), sculpt.side * select(1.0, -1.0, piece == 3), piece >= 2);
-    var distance = length(world_point - center) - SHAPE_BOUND;
+    // Forme centrale entièrement absorbée par la lame : plus rien à calculer.
+    if (piece < 2 && sculpt.scale < 0.02) { continue; }
+    let central_piece = piece < 2;
+    let center = select(sculpt.side * select(1.0, -1.0, piece == 3), vec3f(0.0), central_piece);
+    // La pièce centrale se contracte vers son cœur : on évalue la forme à
+    // l'échelle 1 puis on remet la distance à l'échelle (champ toujours exact).
+    let scale = select(1.0, sculpt.scale, central_piece);
+    let local = (world_point - center) / scale;
+    var distance = length(local) - SHAPE_BOUND;
     if (distance <= BOUND_MARGIN) {
-      distance = shape_distance(select(sculpt.index, sculpt.next, piece == 1), spin(world_point - center));
+      distance = shape_distance(select(sculpt.index, sculpt.next, piece == 1), spin(local));
     }
+    distance *= scale;
     if (piece == 0) {
       central = distance;
     } else if (piece == 1) {
@@ -332,11 +354,16 @@ fn sculpture_distance(world_point: vec3f) -> f32 {
       fragments = min(fragments, distance);
     }
   }
+  // Forme et lame fusionnent (pas de mélange linéaire des champs, qui
+  // laissait des gouttes de la forme autour du rectangle) ; la fusion se
+  // resserre à mesure que la forme disparaît dans la lame.
   if (panel.ease > 0.0) {
-    central = mix(central, panel_distance(world_point), panel.ease);
+    let blade = panel_distance(world_point);
+    central = select(smooth_union(central, blade, 0.02 + 0.3 * sculpt.scale), blade, sculpt.scale < 0.02);
   }
   if (sculpt.pieces < 3) { return central; }
-  return smooth_union(central, fragments, 0.12);
+  if (sculpt.fusion < 0.001) { return min(central, fragments); }
+  return smooth_union(central, fragments, sculpt.fusion);
 }
 
 // Normale par tétraèdre : quatre évaluations, une seule recopie du champ.

@@ -18,6 +18,8 @@ export interface ExampleProps {
   readonly scrollPanel?: () => ScenePanelFrame;
   /** Suspend le rendu tant que la scène est entièrement masquée. */
   readonly paused?: () => boolean;
+  /** Appelé au début de chaque image, avant les lectures du scroll. */
+  readonly beforeFrame?: () => void;
   /** Baisse la définition si la machine ne tient pas la cadence. */
   readonly adaptiveScale?: boolean;
   readonly randomShapeOnMount?: boolean;
@@ -34,6 +36,7 @@ export function Example({
   projects,
   scrollPanel,
   paused,
+  beforeFrame,
   adaptiveScale,
   randomShapeOnMount = false,
   onShapeChange,
@@ -55,6 +58,7 @@ export function Example({
       projects,
       scrollPanel,
       paused,
+      beforeFrame,
       adaptiveScale,
     });
     rendererRef.current = renderer;

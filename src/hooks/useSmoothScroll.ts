@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { cancelFrame, requestFrame } from '../frameClock';
 import { closeProject, isViewing } from '../projectViewer';
 import { WORK_SECTION_ID, nearestWorkStop, workDestination, workStops } from '../workScroll';
 
@@ -117,28 +118,28 @@ export function useSmoothScroll() {
     const busy = (now: number) => glideFrame !== 0 || now < acceptInputAt;
 
     const lerp = (time: number) => {
-      const dt = Math.min(0.05, (time - lastTime) / 1000);
+      const dt = Math.max(0, Math.min(0.05, (time - lastTime) / 1000));
       lastTime = time;
       current += (target - current) * (1 - Math.exp(-SMOOTH_RATE * dt));
       const done = Math.abs(target - current) < 0.5;
       if (done) current = target;
       window.scrollTo(0, current);
-      lerpFrame = done ? 0 : requestAnimationFrame(lerp);
+      lerpFrame = done ? 0 : requestFrame(lerp);
     };
     const startLerp = () => {
       if (lerpFrame) return;
       lastTime = performance.now();
-      lerpFrame = requestAnimationFrame(lerp);
+      lerpFrame = requestFrame(lerp);
     };
     const stopLerp = () => {
-      cancelAnimationFrame(lerpFrame);
+      cancelFrame(lerpFrame);
       lerpFrame = 0;
     };
 
     /** Glisse jusqu'à `destination`, entrées gelées pendant le trajet. */
     const glide = (destination: number) => {
       stopLerp();
-      cancelAnimationFrame(glideFrame);
+      cancelFrame(glideFrame);
       const stops = workStops();
       const spacing = stops ? stops[2] - stops[1] : window.innerHeight;
       const from = window.scrollY;
@@ -146,19 +147,22 @@ export function useSmoothScroll() {
       const crossing = distance > spacing * 0.9;
       const duration = crossing ? CROSSING_DURATION : 700 + 800 * Math.min(1, distance / spacing);
       const ease = crossing ? easeCrossing : easeInOutSine;
-      const startAt = performance.now();
+      // Le trajet part de la première image (son horodatage peut précéder
+      // l'événement qui l'a déclenché).
+      let startAt = -1;
       const step = (now: number) => {
+        if (startAt < 0) startAt = now;
         const t = Math.min(1, (now - startAt) / duration);
         current = target = from + (destination - from) * ease(t);
         window.scrollTo(0, current);
         if (t < 1) {
-          glideFrame = requestAnimationFrame(step);
+          glideFrame = requestFrame(step);
         } else {
           glideFrame = 0;
           acceptInputAt = now + GLIDE_GRACE;
         }
       };
-      glideFrame = requestAnimationFrame(step);
+      glideFrame = requestFrame(step);
     };
 
     /** Au pavé : ce mouvement ouvre-t-il un geste, ou prolonge-t-il un élan déjà utilisé ? */
@@ -325,7 +329,7 @@ export function useSmoothScroll() {
       window.removeEventListener('resize', onResize);
       document.removeEventListener('click', onClickAnchor);
       stopLerp();
-      cancelAnimationFrame(glideFrame);
+      cancelFrame(glideFrame);
       window.clearTimeout(settleTimer);
       html.style.scrollBehavior = previousScrollBehavior;
     };
