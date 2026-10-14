@@ -1,0 +1,1239 @@
+/* ============================================================
+   LUMEN — Studio of light
+   Palette stricte : #000 / #FFF. Une famille (Archivo variable).
+   Hyper minimaliste : typographie massive, images plein écran.
+   ============================================================ */
+
+:root {
+  --paper: #ffffff;
+  --ink: #000000;
+
+  --font-display: "Archivo", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
+
+  --text-display: clamp(3.2rem, 13vw, 13rem);
+  --text-huge: clamp(2.6rem, 8vw, 8rem);
+  --text-title: clamp(1.6rem, 3.6vw, 3.2rem);
+  --text-body: clamp(1rem, 1.15vw, 1.2rem);
+  --text-small: 0.75rem;
+
+  --leading-display: 0.86;
+  --leading-title: 0.95;
+
+  --tracking-caps: 0.14em;
+  --tracking-title: -0.02em;
+
+  --line-white: rgba(255, 255, 255, 0.2);
+  --line-black: rgba(0, 0, 0, 0.2);
+  --muted-white: rgba(255, 255, 255, 0.62);
+  --muted-black: rgba(0, 0, 0, 0.62);
+
+  /* Thème : couleurs des textes posés sur le verre et des pages claires.
+     Le mode nuit les inverse (html[data-theme='night']). */
+  --bg: var(--paper);
+  --fg: var(--ink);
+  --fg-muted: var(--muted-black);
+  --fg-line: var(--line-black);
+  --fg-stroke: rgba(0, 0, 0, 0.35);
+  --bg-muted: var(--muted-white);
+
+  --duration-fast: 120ms;
+  --duration-default: 260ms;
+  --duration-slow: 420ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html[data-theme='night'] {
+  --bg: #050505;
+  --fg: var(--paper);
+  --fg-muted: var(--muted-white);
+  --fg-line: var(--line-white);
+  --fg-stroke: rgba(255, 255, 255, 0.4);
+  --bg-muted: var(--muted-black);
+}
+
+/* Pendant le changement de thème seulement : les couleurs glissent au même
+   rythme que les lumières de la sculpture. */
+html.is-theming *,
+html.is-theming *::before,
+html.is-theming *::after {
+  transition:
+    color 1.2s ease,
+    background-color 1.2s ease,
+    border-color 1.2s ease,
+    -webkit-text-stroke-color 1.2s ease !important;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: auto;
+  background: var(--ink);
+}
+
+body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-size: var(--text-body);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@media (pointer: fine) {
+  .has-cursor,
+  .has-cursor * {
+    cursor: none !important;
+  }
+}
+
+::selection {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* --- utilitaires requis par les exemples vgpu/React --- */
+.relative {
+  position: relative;
+}
+.h-full {
+  height: 100%;
+}
+.w-full {
+  width: 100%;
+}
+.overflow-hidden {
+  overflow: hidden;
+}
+.bg-black {
+  background: var(--ink);
+}
+.block {
+  display: block;
+}
+.touch-none {
+  touch-action: none;
+}
+
+/* ============================================================
+   Structure de page
+   ============================================================ */
+
+.site {
+  position: relative;
+  width: 100%;
+  overflow-x: clip;
+}
+
+.section {
+  position: relative;
+}
+
+/* grille éditoriale : colonnes fantômes façon obys */
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.grid-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(8.333% - 1px),
+    rgba(255, 255, 255, 0.09) calc(8.333% - 1px),
+    rgba(255, 255, 255, 0.09) 8.333%
+  );
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 1.1rem clamp(1.25rem, 4vw, 3rem);
+  color: var(--paper);
+  mix-blend-mode: difference;
+  pointer-events: none;
+}
+
+.site-header > * {
+  pointer-events: auto;
+}
+
+.site-header__mark {
+  justify-self: start;
+  font-size: var(--text-body);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.site-header__nav {
+  justify-self: end;
+  display: flex;
+  gap: clamp(1rem, 3vw, 2.5rem);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.site-header__nav a {
+  position: relative;
+  transition: color var(--duration-fast) ease-out;
+}
+.site-header__nav a:hover,
+.site-header__toggle:hover {
+  opacity: 0.55;
+}
+
+.site-header__toggle {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.site-header__toggle span {
+  opacity: 0.6;
+}
+
+/* ============================================================
+   Backdrop — la sculpture de verre en fond de page
+   ============================================================ */
+
+.glass-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--bg);
+}
+
+.glass-backdrop > div {
+  height: 100%;
+}
+
+.glass-backdrop--fallback {
+  background:
+    radial-gradient(
+      ellipse 55% 50% at 50% 48%,
+      rgba(0, 0, 0, 0.1),
+      transparent 62%
+    ),
+    var(--bg);
+}
+
+/* ============================================================
+   Hero — le mot Lumen se résout en blur dissolve puis se dissout
+   ============================================================ */
+
+.hero {
+  position: relative;
+  z-index: 1;
+  height: 100svh;
+  display: grid;
+  place-items: center;
+  color: var(--fg);
+}
+
+.hero__wordmark {
+  display: inline-block;
+  -webkit-text-stroke: 1px var(--fg-stroke);
+  color: transparent;
+  font-weight: 900;
+  font-stretch: 125%;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-title);
+  line-height: var(--leading-display);
+  font-size: clamp(4.5rem, 16vw, 16rem);
+  white-space: nowrap;
+  will-change: opacity;
+}
+
+/* Entrée du mot : chaque lettre monte d'un flou épais vers le net, en
+   décalé, puis une bande de lumière traverse le contour de gauche à droite. */
+.hero__letter {
+  display: inline-block;
+  background: linear-gradient(
+      100deg,
+      transparent 42%,
+      rgba(255, 255, 255, 0.95) 50%,
+      transparent 58%
+    )
+    150% 0 / 300% 100% no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation:
+    hero-letter-rise 1.5s var(--ease-out) both,
+    hero-letter-light 1.3s cubic-bezier(0.45, 0, 0.2, 1) both;
+  animation-delay:
+    calc(0.3s + var(--letter) * 0.09s),
+    calc(1.35s + var(--letter) * 0.07s);
+}
+
+@keyframes hero-letter-rise {
+  from {
+    opacity: 0;
+    filter: blur(22px);
+    transform: translateY(0.32em) scaleY(1.3);
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+@keyframes hero-letter-light {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+.hero__meta-row {
+  animation: hero-meta-in 1s var(--ease-out) 1.9s both;
+}
+
+@keyframes hero-meta-in {
+  from {
+    opacity: 0;
+    translate: 0 0.6rem;
+  }
+}
+
+.blur-dissolve {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  white-space: nowrap;
+}
+
+.blur-dissolve__layer {
+  grid-area: 1 / 1;
+  will-change: opacity, filter;
+}
+
+.blur-dissolve__svg {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.hero__meta {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: clamp(4.5rem, 8vh, 6rem) clamp(1.25rem, 4vw, 3rem) clamp(1.5rem, 4vh, 3rem);
+  pointer-events: none;
+}
+
+.hero__meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.hero__meta-row--bottom {
+  position: absolute;
+  left: clamp(1.25rem, 4vw, 3rem);
+  right: clamp(1.25rem, 4vw, 3rem);
+  bottom: clamp(1.5rem, 4vh, 3rem);
+}
+
+/* ============================================================
+   Studio : présentation de l'agence, posée sur le verre
+   ============================================================ */
+
+.studio {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: clamp(6rem, 18vh, 12rem);
+  padding: clamp(6rem, 20vh, 12rem) clamp(1.25rem, 4vw, 3rem) clamp(8rem, 24vh, 14rem);
+  color: var(--fg);
+}
+
+/* Projecteur : un rond de lumière suit le curseur (useSpotlight), la
+   scène s'assombrit autour, et chaque texte porte son ombre à l'opposé. */
+.studio {
+  isolation: isolate;
+}
+
+.studio__spot {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--spot-power, 0);
+  /* Fondu aux bords haut et bas : la pénombre ne s'arrête jamais net sur
+     les sections voisines. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30vh, #000 calc(100% - 30vh), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 30vh, #000 calc(100% - 30vh), transparent);
+  background:
+    radial-gradient(
+      circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, 0.95) 0,
+      rgba(255, 255, 255, 0.5) 50px,
+      rgba(255, 255, 255, 0) 140px
+    ),
+    radial-gradient(
+      circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(0, 0, 0, 0) 100px,
+      rgba(0, 0, 0, 0.22) 300px
+    );
+  background-attachment: fixed;
+}
+
+[data-spot] {
+  text-shadow: var(--cast-x, 0) var(--cast-y, 0) var(--cast-blur, 0) rgba(0, 0, 0, var(--cast-alpha, 0));
+}
+
+/* « la lumière », en contour, ne porte pas d'ombre : le faisceau l'allume
+   de l'intérieur. */
+.studio__line--outlined[data-spot] {
+  text-shadow: none;
+  background: radial-gradient(
+      circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, calc(var(--spot-power, 0) * 0.95)) 0,
+      rgba(255, 255, 255, calc(var(--spot-power, 0) * 0.4)) 47px,
+      rgba(255, 255, 255, 0) 100px
+    )
+    fixed;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.studio__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.studio__manifesto {
+  display: grid;
+  font-size: var(--text-huge);
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-title);
+  text-transform: uppercase;
+}
+
+.studio__line:nth-child(even) {
+  justify-self: end;
+}
+
+.studio__line--outlined {
+  -webkit-text-stroke: 1px var(--fg);
+  color: transparent;
+}
+
+.studio__about {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 3rem clamp(1rem, 2vw, 2rem);
+}
+
+.studio__intro {
+  grid-column: 1 / span 7;
+  font-size: var(--text-title);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: var(--tracking-title);
+}
+
+.studio__figures {
+  grid-column: 9 / span 4;
+  display: grid;
+  gap: 1.6rem;
+  align-content: start;
+}
+
+.studio__figures div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 1.2rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--fg-line);
+}
+
+.studio__figures dd {
+  order: -1;
+  font-size: clamp(2.4rem, 5vw, 4.5rem);
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: 1;
+}
+
+.studio__figures dt,
+.studio__number,
+.studio__heading {
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.studio__block {
+  display: grid;
+  gap: 2rem;
+}
+
+.studio__disciplines li {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: clamp(1rem, 2vw, 2rem);
+  padding: clamp(1.2rem, 3vh, 2rem) 0.75rem;
+  border-top: 1px solid var(--fg-line);
+  transition:
+    background var(--duration-default) var(--ease-out),
+    color var(--duration-default) var(--ease-out);
+}
+
+.studio__disciplines li:last-child {
+  border-bottom: 1px solid var(--fg-line);
+}
+
+.studio__disciplines li:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.studio__disciplines li:hover .studio__number {
+  color: var(--bg-muted);
+}
+
+.studio__discipline {
+  font-size: var(--text-title);
+  font-weight: 900;
+  line-height: var(--leading-title);
+  letter-spacing: var(--tracking-title);
+}
+
+.studio__text {
+  font-size: var(--text-body);
+  line-height: 1.45;
+}
+
+.studio__method {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(1rem, 2vw, 2rem);
+}
+
+.studio__method li {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+  padding-top: 1rem;
+  border-top: 1px solid var(--fg);
+}
+
+.studio__step {
+  font-size: clamp(1.2rem, 2vw, 2rem);
+  font-weight: 900;
+  font-stretch: 112%;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.studio__disciplines,
+.studio__method {
+  list-style: none;
+}
+
+[data-reveal] {
+  opacity: 0;
+  translate: 0 1.5rem;
+  transition:
+    opacity 0.9s var(--ease-out),
+    translate 0.9s var(--ease-out);
+}
+
+[data-reveal='true'] {
+  opacity: 1;
+  translate: 0 0;
+}
+
+@media (max-width: 760px) {
+  .studio__intro,
+  .studio__figures {
+    grid-column: 1 / -1;
+  }
+  .studio__disciplines li {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+  }
+  .studio__disciplines .studio__text {
+    grid-column: 2;
+  }
+  .studio__method {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 2.5rem;
+  }
+  .studio__meta span:last-child {
+    display: none;
+  }
+}
+
+/* ============================================================
+   Work — les projets vivent DANS le rendu WebGL (panneaux de
+   verre dans le canvas). Le DOM ne sert plus que de hauteur de
+   défilement et de repère d'accessibilité.
+   ============================================================ */
+
+.work {
+  position: relative;
+  z-index: 1;
+}
+
+/* Chaque projet occupe une tranche de défilement ; le panneau
+   correspondant est animé dans la sculpture (GlassBackdrop). */
+.work__screen {
+  position: relative;
+  height: 150svh;
+  pointer-events: none;
+}
+
+/* Accès clavier aux projets : invisible à la souris, étiquette mono
+   en bas d'écran quand le bouton a le focus. */
+.work__open {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(1.5rem, 4vh, 3rem);
+  padding: 0.6rem 1rem;
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translate(-50%, 150%);
+  clip-path: inset(50%);
+}
+
+.work__open:focus-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  clip-path: none;
+  transition: transform var(--duration-default) var(--ease-out);
+}
+
+/* Zone cliquable calée sur la lame de verre du canvas. */
+.project-hotspot {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: end center;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.project-hotspot[data-active='true'] {
+  pointer-events: auto;
+}
+
+.project-hotspot__label {
+  translate: 0 calc(100% + 1.4rem);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  opacity: 0;
+  transition:
+    opacity var(--duration-default) ease-out,
+    translate var(--duration-slow) var(--ease-out);
+}
+
+.project-hotspot[data-active='true']:hover .project-hotspot__label {
+  opacity: 1;
+  translate: 0 calc(100% + 1rem);
+}
+
+/* Au doigt, pas de survol : l'invitation reste visible sous la lame. */
+@media (hover: none) {
+  .project-hotspot[data-active='true'] .project-hotspot__label {
+    opacity: 1;
+    translate: 0 calc(100% + 1rem);
+  }
+}
+
+/* ============================================================
+   Page projet : prend le relais de la lame quand elle couvre
+   l'écran. Le héros reprend la composition de la tuile de
+   l'atlas (screens.ts) à l'échelle « cover » du viewport.
+   ============================================================ */
+
+html.is-viewing {
+  overflow: hidden;
+}
+
+.project-page {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg);
+  color: var(--fg);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 380ms ease-out,
+    visibility 0s linear 380ms;
+}
+
+.project-page[data-visible='true'] {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 380ms ease-out;
+}
+
+.project-page__close {
+  position: fixed;
+  top: clamp(3.4rem, 7vh, 4.4rem);
+  right: clamp(1.25rem, 4vw, 3rem);
+  z-index: 2;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  transition:
+    background var(--duration-fast) ease-out,
+    color var(--duration-fast) ease-out;
+}
+
+.project-page__close:hover {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.project-page__close span {
+  opacity: 0.55;
+}
+
+.project-hero {
+  --tile: calc(max(100vw / var(--tile-width), 100svh / var(--tile-height)) * 1.03);
+  position: relative;
+  height: 100svh;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.project-hero__tile {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--tile-width) * var(--tile));
+  height: calc(var(--tile-height) * var(--tile));
+  transform: translate(-50%, -50%);
+  color: var(--paper);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.2)),
+    linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.28),
+      rgba(0, 0, 0, 0) 45%,
+      rgba(0, 0, 0, 0.38) 80%,
+      rgba(0, 0, 0, 0.62)
+    ),
+    var(--hero-image) center / cover no-repeat;
+}
+
+.project-hero__index,
+.project-hero__role {
+  position: absolute;
+  left: calc(54 * var(--tile));
+  font-family: var(--font-mono);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.project-hero__index {
+  top: calc(54 * var(--tile));
+  font-size: calc(15 * var(--tile));
+}
+
+.project-hero__role {
+  top: calc((var(--tile-height) - 74) * var(--tile));
+  font-size: calc(13 * var(--tile));
+}
+
+.project-hero__title {
+  position: absolute;
+  top: calc(96 * var(--tile));
+  left: calc(54 * var(--tile));
+  right: calc(54 * var(--tile));
+  font-size: calc(var(--tile-title) * var(--tile));
+  font-weight: 900;
+  line-height: calc(82 / 84);
+  letter-spacing: var(--tracking-title);
+}
+
+.project-intro {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 2rem clamp(1rem, 2vw, 2rem);
+  padding: clamp(5rem, 14vh, 9rem) clamp(1.25rem, 4vw, 3rem) clamp(4rem, 10vh, 7rem);
+}
+
+.project-intro__summary {
+  grid-column: 1 / span 8;
+  font-size: var(--text-title);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: var(--tracking-title);
+}
+
+.project-intro__meta {
+  grid-column: 10 / span 3;
+  display: grid;
+  gap: 1.4rem;
+  align-content: start;
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.project-intro__meta div {
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--fg-line);
+}
+
+.project-intro__meta dt {
+  color: var(--fg-muted);
+  margin-bottom: 0.35rem;
+}
+
+.project-intro__meta dd span {
+  display: block;
+}
+
+.project-figure {
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.project-figure img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-figure--wide {
+  aspect-ratio: 16 / 10;
+  margin: 0 clamp(1.25rem, 4vw, 3rem);
+}
+
+.project-body {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1.4rem clamp(1rem, 2vw, 2rem);
+  padding: clamp(4rem, 12vh, 8rem) clamp(1.25rem, 4vw, 3rem);
+}
+
+.project-body p {
+  grid-column: 6 / span 6;
+  font-size: var(--text-body);
+  line-height: 1.55;
+}
+
+.project-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1rem, 2vw, 2rem);
+  padding: 0 clamp(1.25rem, 4vw, 3rem) clamp(5rem, 14vh, 9rem);
+}
+
+.project-figure--detail {
+  aspect-ratio: 4 / 5;
+}
+
+.project-figure--detail img {
+  transform: scale(1.6);
+  transform-origin: 30% 60%;
+}
+
+.project-figure--mono img {
+  filter: grayscale(1) contrast(1.15);
+  transform-origin: 75% 35%;
+}
+
+.project-next {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.project-next button {
+  display: grid;
+  gap: 1.2rem;
+  width: 100%;
+  padding: clamp(5rem, 16vh, 10rem) clamp(1.25rem, 4vw, 3rem);
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.project-next__label {
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted-white);
+}
+
+.project-next__title {
+  font-size: var(--text-huge);
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-title);
+  text-transform: uppercase;
+  -webkit-text-stroke: 1px var(--paper);
+  color: transparent;
+  transition: color var(--duration-slow) var(--ease-out);
+}
+
+.project-next button:hover .project-next__title {
+  color: var(--paper);
+}
+
+@media (max-width: 760px) {
+  .project-intro__summary,
+  .project-intro__meta,
+  .project-body p {
+    grid-column: 1 / -1;
+  }
+  .project-pair {
+    grid-template-columns: 1fr;
+  }
+  .project-page__close {
+    top: auto;
+    bottom: 1.25rem;
+  }
+}
+
+/* ============================================================
+   Footer — océan de particules + contact
+   ============================================================ */
+
+.footer {
+  position: relative;
+  z-index: 1;
+  min-height: 100svh;
+  background: var(--ink);
+  overflow: hidden;
+}
+
+.footer__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.footer__canvas > div {
+  height: 100%;
+}
+
+.footer__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.85),
+    rgba(0, 0, 0, 0.3) 35%,
+    rgba(0, 0, 0, 0.3) 70%,
+    rgba(0, 0, 0, 0.85)
+  );
+}
+
+.footer__content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100svh;
+  padding: clamp(4.5rem, 8vh, 6rem) clamp(1.25rem, 4vw, 3rem) clamp(1.5rem, 4vh, 3rem);
+}
+
+.footer__cta h2 {
+  font-weight: 900;
+  font-stretch: 125%;
+  font-size: var(--text-huge);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-title);
+  line-height: var(--leading-display);
+}
+
+.footer__cta h2 span {
+  -webkit-text-stroke: 1px var(--paper);
+  color: transparent;
+}
+
+.footer__mail {
+  display: inline-block;
+  margin-top: 2.5rem;
+  font-size: var(--text-title);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid var(--line-white);
+  padding-bottom: 0.3rem;
+  transition: border-color var(--duration-fast) ease-out;
+}
+
+.footer__mail:hover {
+  border-color: var(--paper);
+}
+
+.footer__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--line-white);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted-white);
+}
+
+.footer__social {
+  display: flex;
+  gap: 1.6rem;
+}
+
+.footer__social a {
+  transition: color var(--duration-fast) ease-out;
+}
+.footer__social a:hover {
+  color: var(--paper);
+}
+
+/* ============================================================
+   Curseur personnalisé : étoile 4 branches → soleil
+   ============================================================ */
+
+.cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 48px;
+  height: 48px;
+  pointer-events: none;
+  mix-blend-mode: difference;
+  will-change: transform;
+}
+
+.cursor__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: var(--paper);
+  transition: transform 0.6s var(--ease-out);
+}
+
+.cursor[data-mode='lens'] .cursor__svg {
+  transform: scale(2.2);
+}
+
+.cursor__core {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.5s var(--ease-out);
+}
+
+.cursor__star {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1);
+  transition: transform 0.5s var(--ease-out);
+}
+
+.cursor__rays-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cursor-spin 14s linear infinite;
+  animation-play-state: paused;
+}
+
+.cursor__rays {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0);
+  opacity: 0;
+  transition:
+    transform 0.55s var(--ease-out),
+    opacity 0.4s ease;
+}
+
+.cursor[data-mode='sun'] .cursor__core {
+  transform: scale(1.3);
+}
+
+.cursor[data-mode='sun'] .cursor__star {
+  transform: scale(0);
+}
+
+.cursor[data-mode='sun'] .cursor__rays-spin {
+  animation-play-state: running;
+}
+
+.cursor[data-mode='sun'] .cursor__rays {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.cursor__ring {
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 0.6;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.2);
+  opacity: 0;
+  transition:
+    transform 0.6s var(--ease-out),
+    opacity 0.3s ease;
+}
+
+.cursor[data-mode='lens'] .cursor__ring {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.cursor[data-mode='lens'] .cursor__star {
+  transform: scale(0);
+}
+
+.cursor[data-mode='lens'] .cursor__core {
+  transform: scale(0.35);
+}
+
+@keyframes cursor-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================
+   Réduction de mouvement
+   ============================================================ */
+
+:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* Lien d'évitement : visible à la navigation clavier uniquement. */
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 60;
+  padding: 0.5rem 0.9rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  transform: translateY(-200%);
+  transition: transform var(--duration-fast) ease-out;
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+
+@media (max-width: 560px) {
+  .site-header__mark {
+    font-size: 0.95rem;
+  }
+  .site-header__nav {
+    font-size: 0.68rem;
+  }
+}
