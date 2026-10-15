@@ -42,13 +42,16 @@ export interface RendererOptions {
   readonly adaptiveScale?: boolean;
 }
 
-const SHAPE_MORPH_RATE = 0.85;
+// Les formes suivent le scroll de près (elles reviennent en arrière si on
+// remonte), avec juste assez de retard pour gommer les crans.
+const SHAPE_MORPH_RATE = 5;
 const SHAPE_SNAP = 0.002;
 // Au-delà, la forme a entièrement fondu dans la lame (panel.melt vaut 1
 // dès que le morph dépasse 0.62 dans sculpture.wgsl).
 const HIDDEN_SHAPE_MORPH = 0.95;
-// Un déploiement complet de la lame prend 0,45 s, à vitesse constante.
-const PANEL_MORPH_SPEED = 1 / 0.45;
+// Vitesse maximale de la lame (un dépliage complet en 0,15 s) : bien plus
+// vite que le scroll, elle ne bride que les sauts de page.
+const PANEL_FOLD_SPEED = 1 / 0.15;
 // Sous ~50 images/s en moyenne pendant 1,5 s, la définition baisse d'un
 // cran. Les premières secondes (compilation, chargement des visuels)
 // faussent la mesure : elles sont ignorées.
@@ -310,19 +313,22 @@ function buildGui(
 }
 
 /**
- * La lame suit le scroll à vitesse bornée : jamais d'à-coup, et jamais de
- * traîne (elle atteint vraiment 0 ou 1, au lieu de s'en approcher sans
- * fin). Elle ne change de projet qu'une fois entièrement repliée dans la
- * matière, même si le scroll saute d'un projet à l'autre.
+ * La lame est pilotée par le scroll : sur un même projet, elle prend
+ * exactement la valeur demandée (on peut arrêter la déformation à mi-course
+ * ou la rembobiner). Elle ne change de projet qu'une fois repliée dans la
+ * matière : si le scroll saute d'un projet à l'autre, elle se replie vite
+ * avant de se redéplier sur le nouveau.
  */
 function easePanel(current: ScenePanelFrame, goal: ScenePanelFrame, deltaTime: number): ScenePanelFrame {
-  const sameProject = goal.index === current.index;
-  const goalMorph = sameProject ? goal.morph : 0;
-  const step = PANEL_MORPH_SPEED * Math.max(0, Math.min(0.1, deltaTime));
-  const morph = current.morph + Math.max(-step, Math.min(step, goalMorph - current.morph));
-  if (!sameProject && morph <= 0) return { ...OFF_PANEL_FRAME, index: goal.index };
-  if (!sameProject) return { ...OFF_PANEL_FRAME, morph, index: current.index };
-  return { ...goal, morph };
+  // Vitesse plafonnée bien au-delà de celle d'un scroll normal : elle ne
+  // sert qu'à éviter un saut de la lame quand la page saute.
+  const step = PANEL_FOLD_SPEED * Math.max(0, Math.min(0.1, deltaTime));
+  if (goal.index === current.index) {
+    return { ...goal, morph: current.morph + Math.max(-step, Math.min(step, goal.morph - current.morph)) };
+  }
+  const morph = Math.max(0, current.morph - step);
+  if (morph <= 0) return { ...OFF_PANEL_FRAME, index: goal.index };
+  return { ...OFF_PANEL_FRAME, morph, index: current.index };
 }
 
 /**

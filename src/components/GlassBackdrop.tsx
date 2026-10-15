@@ -23,6 +23,10 @@ function sectionProgress(id: string): number {
   return Math.min(1, Math.max(0, -Math.min(0, rect.top) / span));
 }
 
+// Dérive de la sculpture au repos (unités de temps du shader par seconde :
+// environ un tour toutes les 40 s, et ses mouvements internes continuent).
+const IDLE_SPIN = 0.6;
+
 interface GlassBackdropProps {
   readonly shapeCount: number;
 }
@@ -48,7 +52,9 @@ export function GlassBackdrop({ shapeCount }: GlassBackdropProps) {
     return <div className="glass-backdrop glass-backdrop--fallback" aria-hidden="true" />;
   }
 
-  const rotation = () => pageProgress() * Math.PI * 8;
+  // Rotation liée au scroll, plus une lente dérive dans le temps : la forme
+  // n'est jamais figée, même quand personne ne fait défiler la page.
+  const rotation = () => pageProgress() * Math.PI * 8 + (performance.now() / 1000) * IDLE_SPIN;
   // Chaque forme tient un palier, le passage à la suivante se fait au milieu
   // de sa tranche de scroll : hors passage, une seule forme à calculer.
   // Dans la zone projets, chaque passage entre deux lames montre une forme

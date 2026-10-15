@@ -638,7 +638,7 @@ img {
    correspondant est animé dans la sculpture (GlassBackdrop). */
 .work__screen {
   position: relative;
-  height: 150svh;
+  height: 200svh;
   pointer-events: none;
 }
 
