@@ -42,15 +42,8 @@ export interface RendererOptions {
   readonly adaptiveScale?: boolean;
 }
 
-// Les formes suivent le scroll de près (elles reviennent en arrière si on
-// remonte), avec juste assez de retard pour gommer les crans.
-const SHAPE_MORPH_RATE = 5;
-const SHAPE_SNAP = 0.002;
-// Au-delà, la forme a entièrement fondu dans la lame (panel.melt vaut 1
-// dès que le morph dépasse 0.62 dans sculpture.wgsl).
-const HIDDEN_SHAPE_MORPH = 0.95;
-// Vitesse maximale de la lame (un dépliage complet en 0,15 s) : bien plus
-// vite que le scroll, elle ne bride que les sauts de page.
+// Saut d'un projet à l'autre (lien, scroll très rapide) : la lame se replie
+// en 0,15 s avant de changer de projet.
 const PANEL_FOLD_SPEED = 1 / 0.15;
 // Sous ~50 images/s en moyenne pendant 1,5 s, la définition baisse d'un
 // cran. Les premières secondes (compilation, chargement des visuels)
@@ -206,14 +199,10 @@ export function createRenderer(
         let adjustedTarget = shapeTarget;
         if (shapeValue - shapeTarget > shapeCount / 2) adjustedTarget += shapeCount;
         else if (shapeValue - shapeTarget < -shapeCount / 2) adjustedTarget -= shapeCount;
-        shapeValue += (adjustedTarget - shapeValue) * Math.min(1, time.deltaTime * SHAPE_MORPH_RATE);
-        // Arrivée franche sur la forme visée : tant qu'il reste un écart, le
-        // shader calcule deux formes au lieu d'une.
-        if (Math.abs(adjustedTarget - shapeValue) < SHAPE_SNAP) shapeValue = adjustedTarget;
+        // Les formes suivent exactement le scroll (déjà adouci par la molette
+        // lissée) : aucun retard qui se rattraperait après coup.
+        shapeValue = adjustedTarget;
         panelFrame = easePanel(panelFrame, options.scrollPanel?.() ?? OFF_PANEL_FRAME, time.deltaTime);
-        // Lame entièrement déployée : la forme centrale est invisible, elle
-        // passe d'un coup à la suivante au lieu de se transformer à vue.
-        if (panelFrame.morph >= HIDDEN_SHAPE_MORPH) shapeValue = adjustedTarget;
         scene.render(currentFrame, output, input.camera, controls, {
           sculptureTime: options.scrollRotation ? scrollExtra : sculptureTime,
           clockTime: time.time,
@@ -320,12 +309,8 @@ function buildGui(
  * avant de se redéplier sur le nouveau.
  */
 function easePanel(current: ScenePanelFrame, goal: ScenePanelFrame, deltaTime: number): ScenePanelFrame {
-  // Vitesse plafonnée bien au-delà de celle d'un scroll normal : elle ne
-  // sert qu'à éviter un saut de la lame quand la page saute.
+  if (goal.index === current.index) return goal;
   const step = PANEL_FOLD_SPEED * Math.max(0, Math.min(0.1, deltaTime));
-  if (goal.index === current.index) {
-    return { ...goal, morph: current.morph + Math.max(-step, Math.min(step, goal.morph - current.morph)) };
-  }
   const morph = Math.max(0, current.morph - step);
   if (morph <= 0) return { ...OFF_PANEL_FRAME, index: goal.index };
   return { ...OFF_PANEL_FRAME, morph, index: current.index };

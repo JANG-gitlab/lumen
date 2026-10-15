@@ -149,12 +149,18 @@ interface SceneTargets {
 }
 
 // Part de l'historique dans chaque image de l'anti-crénelage temporel : forte
-// au repos, faible quand la lame avance ou se déplie (sinon l'image d'avant
-// traîne en blocs derrière le mouvement).
+// au repos, presque nulle dès que la scène bouge au scroll (rotation, forme,
+// lame) : sinon l'image d'avant traîne derrière le mouvement, puis se recale
+// d'un coup à l'arrêt.
 const HISTORY_WEIGHT = 0.9;
-const MOVING_HISTORY_WEIGHT = 0.35;
+const MOVING_HISTORY_WEIGHT = 0.12;
 const LIFT_MOTION_GAIN = 40;
 const MORPH_MOTION_GAIN = 15;
+const SHAPE_MOTION_GAIN = 30;
+// Rotation par image (en temps de sculpture) en deçà de laquelle la scène
+// est « au repos » : couvre la lente dérive, pas une rotation au scroll.
+const IDLE_ROTATION_STEP = 0.02;
+const ROTATION_MOTION_GAIN = 25;
 // Décalages sous-pixel successifs (suite de Halton 2, 3) : huit images
 // couvrent le pixel de façon régulière.
 const JITTER_SEQUENCE: ReadonlyArray<readonly [number, number]> = Array.from({ length: 8 }, (_, index) => [
@@ -284,6 +290,8 @@ export function createScene(
   let history = targets.historyA;
   let resolved = targets.historyB;
   let previousPanel = OFF_PANEL_FRAME;
+  let previousTime = 0;
+  let previousShape = 0;
 
   try {
     bindTargets();
@@ -329,9 +337,13 @@ export function createScene(
       const motion = Math.min(
         1,
         Math.abs(panelState.lift - previousPanel.lift) * LIFT_MOTION_GAIN +
-          Math.abs(panelState.morph - previousPanel.morph) * MORPH_MOTION_GAIN,
+          Math.abs(panelState.morph - previousPanel.morph) * MORPH_MOTION_GAIN +
+          Math.abs(state.shape - previousShape) * SHAPE_MOTION_GAIN +
+          Math.max(0, Math.abs(state.sculptureTime - previousTime) - IDLE_ROTATION_STEP) * ROTATION_MOTION_GAIN,
       );
       previousPanel = panelState;
+      previousTime = state.sculptureTime;
+      previousShape = state.shape;
       const historyWeight = HISTORY_WEIGHT + (MOVING_HISTORY_WEIGHT - HISTORY_WEIGHT) * motion;
       sculpture.set({
         params: {
