@@ -43,7 +43,7 @@ const METHOD = [
 
 // Une ligne du manifeste se résout entre ces deux hauteurs d'écran.
 const REVEAL_START = 0.92;
-const REVEAL_SPAN = 0.32;
+const REVEAL_SPAN = 0.5;
 
 /**
  * Présentation du studio, posée à même la sculpture de verre. Le manifeste

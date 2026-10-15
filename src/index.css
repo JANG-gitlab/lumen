@@ -259,10 +259,18 @@ img {
 .hero {
   position: relative;
   z-index: 1;
+  /* Plus haut que l'écran : la scène reste en place (sticky) pendant que le
+     mot se dissout au scroll, au lieu de filer avec la page. */
+  height: 220svh;
+  color: var(--fg);
+}
+
+.hero__stage {
+  position: sticky;
+  top: 0;
   height: 100svh;
   display: grid;
   place-items: center;
-  color: var(--fg);
 }
 
 .hero__wordmark {
@@ -388,8 +396,8 @@ img {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: clamp(6rem, 18vh, 12rem);
-  padding: clamp(6rem, 20vh, 12rem) clamp(1.25rem, 4vw, 3rem) clamp(8rem, 24vh, 14rem);
+  gap: clamp(10rem, 34vh, 22rem);
+  padding: clamp(10rem, 36vh, 22rem) clamp(1.25rem, 4vw, 3rem) clamp(12rem, 44vh, 26rem);
   color: var(--fg);
 }
 
@@ -638,7 +646,7 @@ img {
    correspondant est animé dans la sculpture (GlassBackdrop). */
 .work__screen {
   position: relative;
-  height: 200svh;
+  height: 300svh;
   pointer-events: none;
 }
 
