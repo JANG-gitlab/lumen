@@ -11,7 +11,6 @@ struct SculptureParams {
   dispersion: f32,
   strip_angle: f32,
   floor_luminance: f32,
-  split: f32,
   key: vec4f,
   key_color: vec4f,
   rim: vec4f,
@@ -173,23 +172,35 @@ fn mobius_distance(point: vec3f) -> f32 {
 }
 
 // Lame projet : un rectangle de verre (ratio paysage piloté par
-// `panel_aspect`) tourné vers la caméra. La pièce centrale de la sculpture
-// se transforme en lame par interpolation de champ, comme le passage d'une
-// forme à l'autre : une seule matière, jamais deux objets.
+// `panel_aspect`) tourné vers la caméra. La sculpture s'y transforme en
+// trois temps qui se chevauchent, sans jamais devenir deux objets :
+// 1. pressée : la forme s'aplatit face à la caméra en s'étalant, comme une
+//    fleur pressée dans le verre (sa silhouette reste lisible) ;
+// 2. fondue : elle coule en un disque liquide, bord ondulant et ondes
+//    concentriques à sa surface ;
+// 3. tendue : le disque s'étire jusqu'au format de la lame en basculant un
+//    peu, ses coins se resserrent, les ondes s'apaisent et il se pose face
+//    à la caméra.
 const PANEL_CORNER: f32 = 0.08;
 const PANEL_EDGE: f32 = 0.035;
 const PANEL_DEPTH_RATIO: f32 = 0.09;
 const PANEL_RIPPLE: f32 = 0.06;
 const PANEL_IMAGE_DEPTH: f32 = 0.6;
-const PANEL_CLEARANCE: f32 = 0.83;
-// Encombrement réel d'un fragment (les formes tiennent dans ~1.2) plus un
-// vide franc : les fragments ne doivent jamais toucher les bords de la lame.
-const FRAGMENT_REACH: f32 = 1.25;
-const FRAGMENT_GAP: f32 = 0.2;
-const SHAPE_FUSION: f32 = 0.12;
 const PANEL_COVER: f32 = 1.03;
 const LENS_RADIUS: f32 = 0.22;
 const LENS_HEIGHT: f32 = 0.07;
+// Forme pressée : épaisseur restante et étalement de sa silhouette.
+const PRESSED_THICKNESS: f32 = 0.2;
+const PRESSED_SPREAD: f32 = 1.35;
+// Bascule de la lame pendant qu'elle se tend (radians, au plus fort).
+const TENSION_SWING: f32 = 0.45;
+// Disque liquide : rayon (relatif à la demi-hauteur de la lame), épaisseur,
+// amplitude et nombre de lobes de l'ondulation du bord.
+const DISC_RADIUS: f32 = 0.95;
+const DISC_DEPTH: f32 = 0.2;
+const DISC_WOBBLE: f32 = 0.08;
+const DISC_LOBES: f32 = 5.0;
+const DISC_RINGS: f32 = 0.035;
 
 struct PanelFrame {
   center: vec3f,
@@ -200,6 +211,18 @@ struct PanelFrame {
   half_depth: f32,
   ease: f32,
   calm: f32,
+  // Normale de la face de la lame, une fois tournée (voir panel_local).
+  face: vec3f,
+  // Rotation de la lame autour de son axe vertical (cosinus, sinus).
+  swing: vec2f,
+  corner: f32,
+  // Épaisseur relative de la forme pressée (1 : intacte) et étalement.
+  thin: f32,
+  spread: f32,
+  // Part de la forme fondue dans le disque (1 : il ne reste que la lame).
+  melt: f32,
+  wobble: f32,
+  rings: f32,
 }
 
 struct ShapeState {
@@ -207,14 +230,8 @@ struct ShapeState {
   index: i32,
   next: i32,
   blend: f32,
-  side: vec3f,
   bounds: vec3f,
-  pieces: i32,
   zero: i32,
-  // Échelle de la pièce centrale : elle se contracte dans la lame qui grandit.
-  scale: f32,
-  // Rayon de fusion fragments / pièce centrale, nul une fois la lame posée.
-  fusion: f32,
 }
 
 // Constantes par pixel, calculées une fois dans fs_main plutôt qu'à chaque
@@ -231,36 +248,39 @@ fn prepare_frame(camera_position: vec3f, right: vec3f, up: vec3f, screen_aspect:
   let lift = clamp(params.panel_lift, 0.0, 1.0);
   let cover_distance = CAMERA_LENS * params.panel_half_height * min(1.0, aspect / screen_aspect) / PANEL_COVER;
   let travel = (length(camera_position - CAMERA_TARGET) - cover_distance) * lift;
-  // Dépliage : la lame naît petite et épaisse au cœur de la forme, puis
-  // s'étire jusqu'à sa taille finale en s'affinant (épaisseur liée à la
-  // hauteur), pendant que la forme se contracte en elle.
-  let half_height = params.panel_half_height * mix(0.2, 1.0, ease);
+
+  let pressed = smoothstep(0.0, 0.4, morph);
+  let melt = smoothstep(0.3, 0.62, morph);
+  let tension = smoothstep(0.5, 1.0, morph);
+  let full = vec2f(params.panel_half_height * aspect, params.panel_half_height);
+  let disc = DISC_RADIUS * params.panel_half_height;
+  let half_size = mix(vec2f(disc), full, tension);
+  let swing = TENSION_SWING * sin(3.14159 * tension) * (1.0 - 0.5 * tension);
+  let swing_cs = vec2f(cos(swing), sin(swing));
   panel = PanelFrame(
     CAMERA_TARGET + facing * travel,
     right,
     up,
     facing,
-    vec2f(half_height * aspect, half_height),
-    half_height * mix(0.45, PANEL_DEPTH_RATIO, ease),
+    half_size,
+    mix(DISC_DEPTH * params.panel_half_height, PANEL_DEPTH_RATIO * params.panel_half_height, tension),
     ease,
     1.0 - smoothstep(0.0, 0.6, lift),
+    facing * swing_cs.x - right * swing_cs.y,
+    swing_cs,
+    mix(disc, PANEL_CORNER, tension * tension),
+    mix(1.0, PRESSED_THICKNESS, pressed),
+    mix(1.0, PRESSED_SPREAD, pressed),
+    melt,
+    DISC_WOBBLE * melt * (1.0 - tension),
+    DISC_RINGS * melt * (1.0 - tension) * params.panel_half_height,
   );
 
-  // Fragmentation : des copies de la sculpture s'écartent de part et
-  // d'autre de l'écran. La lame qui se déplie les repousse hors de son
-  // emprise, comme si la matière se partageait pour lui faire place.
-  // L'écart minimal suit la largeur réelle de la lame déployée (elle change
-  // avec le format de l'écran), sinon les fragments viennent s'y souder.
-  let split_amount = max(clamp(params.split, 0.0, 1.0), ease * PANEL_CLEARANCE);
-  let clearance = params.panel_half_height * aspect + FRAGMENT_REACH + FRAGMENT_GAP;
-  let side_distance = max(split_amount * 3.2, clearance * smoothstep(0.0, 0.6, ease));
-  let side = select(right * side_distance, vec3f(0.0), split_amount < 0.001);
-
-  // Boîte englobant toute la sculpture (pièce centrale, fragments, lame) :
-  // les rayons qui la manquent ne marchent pas du tout.
-  var bounds = abs(side) + vec3f(SHAPE_BOUND + BOUND_MARGIN);
+  // Boîte englobant la sculpture et la lame : les rayons qui la manquent ne
+  // marchent pas du tout.
+  var bounds = vec3f(SHAPE_BOUND + BOUND_MARGIN);
   if (ease > 0.0) {
-    let panel_reach = length(vec3f(panel.half_size, panel.half_depth)) + BOUND_MARGIN;
+    let panel_reach = length(vec3f(panel.half_size, panel.half_depth)) + panel.wobble + BOUND_MARGIN;
     bounds = max(bounds, abs(panel.center) + vec3f(panel_reach));
   }
 
@@ -271,25 +291,33 @@ fn prepare_frame(camera_position: vec3f, right: vec3f, up: vec3f, screen_aspect:
     i32(floor(shape_value)) % shape_count,
     (i32(floor(shape_value)) + 1) % shape_count,
     shape_value - floor(shape_value),
-    side,
     bounds,
-    select(4, 2, split_amount < 0.001),
     min(shape_count, 0),
-    1.0 - ease,
-    SHAPE_FUSION * (1.0 - smoothstep(0.0, 0.5, ease)),
   );
 }
 
+// Coordonnées dans le repère de la lame, rotation autour de son axe
+// vertical comprise (z suit la normale `panel.face`).
 fn panel_local(point: vec3f) -> vec3f {
   let offset = point - panel.center;
-  return vec3f(dot(offset, panel.right), dot(offset, panel.up), dot(offset, panel.facing));
+  let x = dot(offset, panel.right);
+  let z = dot(offset, panel.facing);
+  return vec3f(panel.swing.x * x + panel.swing.y * z, dot(offset, panel.up), panel.swing.x * z - panel.swing.y * x);
 }
 
-fn panel_distance(point: vec3f) -> f32 {
-  let local = panel_local(point);
-  let corner = abs(local.xy) - panel.half_size + PANEL_CORNER;
-  let outline = length(max(corner, vec2f(0.0))) + min(max(corner.x, corner.y), 0.0) - PANEL_CORNER;
-  let slab = vec2f(outline + PANEL_EDGE, abs(local.z) - panel.half_depth + PANEL_EDGE);
+fn panel_distance(local: vec3f) -> f32 {
+  let corner = abs(local.xy) - panel.half_size + panel.corner;
+  var outline = length(max(corner, vec2f(0.0))) + min(max(corner.x, corner.y), 0.0) - panel.corner;
+  // Bord liquide du disque : des lobes qui tournent lentement.
+  if (panel.wobble > 0.0) {
+    outline += panel.wobble * sin(atan2(local.y, local.x) * DISC_LOBES + params.clock * 1.7);
+  }
+  // Ondes concentriques qui partent du centre et gonflent la surface.
+  var depth = panel.half_depth;
+  if (panel.rings > 0.0) {
+    depth += panel.rings * sin(length(local.xy) * 14.0 - params.clock * 5.0);
+  }
+  let slab = vec2f(outline + PANEL_EDGE, abs(local.z) - depth + PANEL_EDGE);
   return length(max(slab, vec2f(0.0))) + min(max(slab.x, slab.y), 0.0) - PANEL_EDGE;
 }
 
@@ -322,48 +350,41 @@ fn spin(world_point: vec3f) -> vec3f {
   return vec3f(rotated.x, world_point.y, rotated.y);
 }
 
-// Rotation temporelle, morph entre formes, lame projet puis fragments
-// latéraux : tout passe par ce champ unique (normale et matière communes).
-// Les pièces (forme courante, forme suivante pendant un morph, deux
-// fragments) passent par une seule évaluation de forme dans une boucle que
-// le compilateur ne peut pas dérouler : sinon il recopie les neuf formes à
-// chaque appel, et la compilation du shader prend plusieurs secondes.
+// Rotation temporelle, morph entre formes puis lame projet : tout passe par
+// ce champ unique (normale et matière communes). Les deux formes d'un morph
+// passent par une seule évaluation dans une boucle que le compilateur ne
+// peut pas dérouler : sinon il recopie les neuf formes à chaque appel, et
+// la compilation du shader prend plusieurs secondes.
 fn sculpture_distance(world_point: vec3f) -> f32 {
-  var central = 1e5;
-  var fragments = 1e5;
-  for (var piece = sculpt.zero; piece < sculpt.pieces; piece += 1) {
-    if (piece == 1 && sculpt.blend < 0.001) { continue; }
-    // Forme centrale entièrement absorbée par la lame : plus rien à calculer.
-    if (piece < 2 && sculpt.scale < 0.02) { continue; }
-    let central_piece = piece < 2;
-    let center = select(sculpt.side * select(1.0, -1.0, piece == 3), vec3f(0.0), central_piece);
-    // La pièce centrale se contracte vers son cœur : on évalue la forme à
-    // l'échelle 1 puis on remet la distance à l'échelle (champ toujours exact).
-    let scale = select(1.0, sculpt.scale, central_piece);
-    let local = (world_point - center) / scale;
-    var distance = length(local) - SHAPE_BOUND;
-    if (distance <= BOUND_MARGIN) {
-      distance = shape_distance(select(sculpt.index, sculpt.next, piece == 1), spin(local));
-    }
-    distance *= scale;
-    if (piece == 0) {
-      central = distance;
-    } else if (piece == 1) {
-      central = mix(central, distance, sculpt.blend);
-    } else {
-      fragments = min(fragments, distance);
-    }
-  }
-  // Forme et lame fusionnent (pas de mélange linéaire des champs, qui
-  // laissait des gouttes de la forme autour du rectangle) ; la fusion se
-  // resserre à mesure que la forme disparaît dans la lame.
+  var shape_point = world_point;
+  var shape_scale = 1.0;
+  var local = vec3f(0.0);
   if (panel.ease > 0.0) {
-    let blade = panel_distance(world_point);
-    central = select(smooth_union(central, blade, 0.02 + 0.3 * sculpt.scale), blade, sculpt.scale < 0.02);
+    // Forme pressée : on la lit dans le repère tourné de la lame, étirée le
+    // long de la normale (donc aplatie à l'écran), et on remet la distance
+    // à l'échelle. Identité exacte quand la lame est à zéro.
+    local = panel_local(world_point);
+    let right = panel.right * panel.swing.x + panel.facing * panel.swing.y;
+    shape_point = panel.center + (right * local.x + panel.up * local.y) / panel.spread + panel.face * (local.z / panel.thin);
+    shape_scale = panel.thin;
   }
-  if (sculpt.pieces < 3) { return central; }
-  if (sculpt.fusion < 0.001) { return min(central, fragments); }
-  return smooth_union(central, fragments, sculpt.fusion);
+  var central = 1e5;
+  if (panel.melt < 0.999) {
+    for (var piece = sculpt.zero; piece < 2; piece += 1) {
+      if (piece == 1 && sculpt.blend < 0.001) { continue; }
+      var distance = length(shape_point) - SHAPE_BOUND;
+      if (distance <= BOUND_MARGIN) {
+        distance = shape_distance(select(sculpt.index, sculpt.next, piece == 1), spin(shape_point));
+      }
+      central = select(mix(central, distance, sculpt.blend), distance, piece == 0);
+    }
+    central *= shape_scale;
+  }
+  if (panel.ease <= 0.0) { return central; }
+  // La forme pressée fond dans le disque liquide, qui se tend en lame.
+  let blade = panel_distance(local);
+  if (panel.melt >= 0.999) { return blade; }
+  return mix(central, blade, panel.melt);
 }
 
 // Normale par tétraèdre : quatre évaluations, une seule recopie du champ.
@@ -524,12 +545,12 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     if (panel.ease > 0.0) {
       let local = panel_local(point);
       let uv = vec2f(0.5 + 0.5 * local.x / panel.half_size.x, 0.5 - 0.5 * local.y / panel.half_size.y);
-      let facing = smoothstep(0.35, 0.8, dot(normal, panel.facing));
+      let facing = smoothstep(0.35, 0.8, dot(normal, panel.face));
       // Le visuel se condense dans le verre sur toute l'emprise du rectangle
       // pendant le dépliage, au lieu d'apparaître d'abord sur les bords.
       let outside = max(abs(local.x) - panel.half_size.x, abs(local.y) - panel.half_size.y);
       let footprint = 1.0 - smoothstep(-0.03, 0.0, outside);
-      let presence = smoothstep(0.35, 0.9, panel.ease) * facing * footprint;
+      let presence = smoothstep(0.5, 0.95, panel.ease) * facing * footprint;
       if (presence > 0.0) {
         let flat_normal = normal;
         normal = normalize(normal + panel_ripple(uv) * presence);

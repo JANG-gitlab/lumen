@@ -10,8 +10,6 @@ export interface ExampleProps {
   readonly gui?: boolean;
   readonly scrollRotation?: () => number;
   readonly scrollShapeMorph?: () => number;
-  /** Écartement de fragmentation (0..1), piloté par le scroll. */
-  readonly scrollSplit?: () => number;
   /** Projets affichés dans des panneaux de verre rendus dans le canvas. */
   readonly projects?: readonly ProjectVisual[];
   /** État courant de la transition de panneaux projets. */
@@ -32,7 +30,6 @@ export function Example({
   gui = false,
   scrollRotation,
   scrollShapeMorph,
-  scrollSplit,
   projects,
   scrollPanel,
   paused,
@@ -54,7 +51,6 @@ export function Example({
       gui,
       scrollRotation,
       scrollShapeMorph,
-      scrollSplit,
       projects,
       scrollPanel,
       paused,

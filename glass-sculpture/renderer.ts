@@ -24,8 +24,6 @@ export interface RendererOptions {
   readonly scrollRotation?: () => number;
   /** Retourne un décalage d'indice de forme (0..SHAPES.length), piloté par le scroll. */
   readonly scrollShapeMorph?: () => number;
-  /** Retourne l'écartement de fragmentation (0..1), piloté par le scroll. */
-  readonly scrollSplit?: () => number;
   /** Liste des projets affichés dans l'atlas (panneaux de verre). */
   readonly projects?: readonly ProjectVisual[];
   /** Fournit l'état courant de la transition de panneaux. */
@@ -46,8 +44,8 @@ export interface RendererOptions {
 
 const SHAPE_MORPH_RATE = 0.85;
 const SHAPE_SNAP = 0.002;
-// Au-delà, la forme centrale est entièrement absorbée par la lame (voir
-// sculpt.scale dans sculpture.wgsl, seuil 0.02 sur l'échelle 1 - ease).
+// Au-delà, la forme a entièrement fondu dans la lame (panel.melt vaut 1
+// dès que le morph dépasse 0.62 dans sculpture.wgsl).
 const HIDDEN_SHAPE_MORPH = 0.95;
 // Un déploiement complet de la lame prend 0,45 s, à vitesse constante.
 const PANEL_MORPH_SPEED = 1 / 0.45;
@@ -218,7 +216,6 @@ export function createRenderer(
           clockTime: time.time,
           deltaTime: time.deltaTime,
           light: input.light,
-          split: options.scrollSplit?.() ?? 0,
           shape: ((shapeValue % shapeCount) + shapeCount) % shapeCount,
         });
         adaptScale?.(time.deltaTime);

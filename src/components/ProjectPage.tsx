@@ -105,6 +105,10 @@ export function ProjectPage() {
               ))}
             </dd>
           </div>
+          <div>
+            <dt>Photo</dt>
+            <dd>{project.photographer} / Unsplash</dd>
+          </div>
         </dl>
       </section>
 

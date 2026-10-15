@@ -230,7 +230,6 @@ export interface SceneState {
   readonly deltaTime: number;
   readonly light: { readonly azimuth: number; readonly elevation: number };
   readonly shape: number;
-  readonly split: number;
 }
 
 export interface SculptureScene {
@@ -348,7 +347,6 @@ export function createScene(
           dispersion: currentControls.dispersion ? 1 : 0,
           strip_angle: 0.8 + state.clockTime * 0.1,
           floor_luminance: rig.floorLuminance,
-          split: state.split,
           key: [...keyDirection, rig.keyPower],
           key_color: [...rig.keyColor, 0],
           rim: [...rimDirection, rig.rimPower],

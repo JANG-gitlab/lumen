@@ -7,8 +7,6 @@ import { panelFeedback, viewerState } from '../projectViewer';
 import { currentTheme, subscribeTheme } from '../theme';
 import { WORK_SECTION_ID, panelTarget, workCrossing } from '../workScroll';
 
-// Part de la zone projets pendant laquelle les fragments s'écartent.
-const FRAGMENTS_OPENING = 0.04;
 
 function pageProgress(): number {
   const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
@@ -31,8 +29,8 @@ interface GlassBackdropProps {
 
 /**
  * Sculpture de verre en fond de page, pleine page et fixe.
- * Elle suit le scroll global : rotation continue, morph en douceur,
- * puis fragmentation (écarts sur les côtés) en approchant des projets.
+ * Elle suit le scroll global : rotation continue, morph en douceur, une
+ * seule pièce de verre du début à la fin.
  * Dans la zone projets, chaque projet est porté par un panneau de verre
  * rendu dans le canvas lui-même (inspiration activetheory.net) : plus rien
  * ne passe par-dessus le rendu, tout vit dans la même matière.
@@ -61,16 +59,6 @@ export function GlassBackdrop({ shapeCount }: GlassBackdropProps) {
     const local = Math.min(1, Math.max(0, (position - step - 0.3) / 0.4));
     return step + local * local * (3 - 2 * local) + workCrossing(workProgress());
   };
-  // Les fragments s'ouvrent à l'entrée de la zone projets, en même temps que
-  // la première lame, puis restent écartés : entre deux projets, seule la
-  // pièce centrale se replie (0.83, même écart que PANEL_CLEARANCE dans
-  // sculpture.wgsl). Ils s'éloignent encore un peu vers la fin de la zone.
-  const split = () => {
-    const progress = workProgress();
-    const opening = Math.min(1, progress / FRAGMENTS_OPENING);
-    const spread = Math.min(1, Math.max(0, (progress - 0.4) / 0.47));
-    return Math.max(opening * opening * (3 - 2 * opening) * 0.83, spread);
-  };
   // Projet ouvert : la lame reste déployée sur ce projet, quel que soit le
   // scroll, pour pouvoir avancer vers la caméra puis revenir en place.
   const scrollPanel = (): ScenePanelFrame => {
@@ -96,7 +84,6 @@ export function GlassBackdrop({ shapeCount }: GlassBackdropProps) {
         interactive={false}
         scrollRotation={rotation}
         scrollShapeMorph={shapeMorph}
-        scrollSplit={split}
         projects={PROJECTS}
         scrollPanel={scrollPanel}
         paused={paused}

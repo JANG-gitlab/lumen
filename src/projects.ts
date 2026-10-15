@@ -9,6 +9,8 @@ export interface Project extends ProjectVisual {
   readonly services: readonly string[];
   readonly summary: string;
   readonly body: readonly string[];
+  /** Auteur de la photo (Unsplash), crédité sur la page projet. */
+  readonly photographer: string;
 }
 
 export const PROJECTS: readonly Project[] = [
@@ -17,7 +19,8 @@ export const PROJECTS: readonly Project[] = [
     slug: 'heliotrope',
     title: 'Heliotrope',
     role: 'Identité — Web3D',
-    image: unsplash('photo-1498050108023-c5249f4df085'),
+    image: unsplash('photo-1746343365514-0c20c00a4318'),
+    photographer: 'Declan Sun',
     year: '2026',
     client: 'Heliotrope Studio',
     services: ['Identité visuelle', 'Site Web3D', 'Direction artistique'],
@@ -32,7 +35,8 @@ export const PROJECTS: readonly Project[] = [
     slug: 'ghoster',
     title: 'Ghoster',
     role: 'Webdesign — Motion',
-    image: unsplash('photo-1519389950473-47ba0277781c'),
+    image: unsplash('photo-1529455949509-8237a70382f0'),
+    photographer: 'Randy Laybourne',
     year: '2026',
     client: 'Ghoster',
     services: ['Webdesign', 'Motion design', 'Prototype'],
@@ -47,7 +51,8 @@ export const PROJECTS: readonly Project[] = [
     slug: 'null-forms',
     title: 'Null Forms',
     role: 'Web3D — Art',
-    image: unsplash('photo-1461749280684-dccba630e2f6'),
+    image: unsplash('photo-1759583545970-0106ff47353f'),
+    photographer: 'Rohit Choudhari',
     year: '2025',
     client: 'Projet personnel',
     services: ['Web3D', 'Shaders', 'Installation'],
@@ -62,7 +67,8 @@ export const PROJECTS: readonly Project[] = [
     slug: 'noir-depot',
     title: 'Noir Dépôt',
     role: 'Identité — Packaging',
-    image: unsplash('photo-1522542550221-31fd19575a2d'),
+    image: unsplash('photo-1638126687923-31912a6ee0ff'),
+    photographer: 'Thomas Murphy',
     year: '2025',
     client: 'Noir Dépôt',
     services: ['Identité visuelle', 'Packaging', 'Signalétique'],
@@ -77,7 +83,8 @@ export const PROJECTS: readonly Project[] = [
     slug: 'piano-club',
     title: 'Piano Club',
     role: 'Identité — Affichage',
-    image: unsplash('photo-1547658719-da2b51169166'),
+    image: unsplash('photo-1513883049090-d0b7439799bf'),
+    photographer: 'Dolo Iglesias',
     year: '2024',
     client: 'Piano Club, Blois',
     services: ['Identité visuelle', 'Affiches', 'Programmation'],
