@@ -31,20 +31,27 @@ export function BlurDissolve({ outgoing, incoming, progressRef, className }: Blu
 
   useEffect(() => {
     let raf = 0;
+    let applied = -1;
+    const paint = (element: HTMLSpanElement | null, opacity: number, blur: number) => {
+      if (!element) return;
+      // Presque invisible : on retire la couche du rendu au lieu de payer un
+      // grand flou que personne ne voit.
+      const hidden = opacity < MIN_VISIBLE_OPACITY;
+      element.style.visibility = hidden ? 'hidden' : '';
+      element.style.opacity = `${opacity}`;
+      element.style.filter = hidden || blur < 0.05 ? '' : `blur(${blur.toFixed(2)}px)`;
+    };
     const apply = () => {
+      raf = requestAnimationFrame(apply);
       const fraction = Math.min(1, Math.max(0, progressRef.current));
+      // Rien n'a bougé : aucune écriture, donc aucun nouveau calcul du flou.
+      if (Math.abs(fraction - applied) < 0.001) return;
+      applied = fraction;
       // L'opacité grimpe en puissance 0.4 : accumulation « liquide ».
       const inOpacity = Math.pow(fraction, 0.4);
       const outOpacity = Math.pow(1 - fraction, 0.4);
-      if (outRef.current) {
-        outRef.current.style.opacity = `${hasMorph ? outOpacity : inOpacity}`;
-        outRef.current.style.filter = `blur(${blurPx(hasMorph ? 1 - fraction : fraction)}px)`;
-      }
-      if (inRef.current) {
-        inRef.current.style.opacity = `${inOpacity}`;
-        inRef.current.style.filter = `blur(${blurPx(fraction)}px)`;
-      }
-      raf = requestAnimationFrame(apply);
+      paint(outRef.current, hasMorph ? outOpacity : inOpacity, blurPx(hasMorph ? 1 - fraction : fraction));
+      paint(inRef.current, inOpacity, blurPx(fraction));
     };
     raf = requestAnimationFrame(apply);
     return () => cancelAnimationFrame(raf);
@@ -83,7 +90,14 @@ export function BlurDissolve({ outgoing, incoming, progressRef, className }: Blu
   );
 }
 
+// En deçà, la couche n'est plus rendue du tout.
+const MIN_VISIBLE_OPACITY = 0.02;
+// Le coût d'un flou CSS croît avec son rayon, sur des textes grands comme
+// l'écran : mesuré, au-delà de 10 px le rendu tombe sous 60 images/s
+// pendant la dissolution. À 10 px, le texte est déjà méconnaissable.
+const MAX_BLUR = 10;
+
 function blurPx(opacity: number): number {
-  if (opacity <= 0) return 100;
-  return Math.min(8 / opacity - 8, 100);
+  if (opacity <= 0) return MAX_BLUR;
+  return Math.min(8 / opacity - 8, MAX_BLUR);
 }
